@@ -1,0 +1,2 @@
+# monthball uses only the Python 3 standard library.
+# This file is intentionally empty (kept for convention / future deps).
