@@ -21,6 +21,11 @@ MID_WINDOW_BREAK_DAYS = 25
 POST_WINDOW_BREAK_DAYS = 15
 
 
+def _days_in_month(month: int, year: int) -> int:
+    next_month = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return (next_month - date(year, month, 1)).days
+
+
 class Season:
     def __init__(self, season_number=1, start_date=None, teams=None, free_agents=None):
         self.season_number = season_number
@@ -87,12 +92,38 @@ class Season:
         self.end_date = year_end
 
     def _assign_initial_squads(self, year):
-        weeks = generate_weeks(year)
-        for p in weeks:
-            month_name = MONTHS[p.start_date.month - 1]
-            self.teams[month_name].add_player(p)
-        for t in self.teams.values():
-            t.cash = economy.starting_cash(t, 30)
+        """
+        Season 1 kickoff — no more "your month's weeks are automatically
+        yours". Instead: the PRE-GAME season (year - 1, e.g. 2025 for a
+        2026 start) generates its weeks straight into the shared free-agent
+        pool, every team starts with empty rosters and base cash, and then
+        an initial draft runs the normal transfer-window AI against that
+        pool. Teams that come up short on a position buy in; teams that
+        land well can stock up further, hold cash, or (in later windows)
+        sell surplus — all the same market logic as mid/post-season windows,
+        just run enough times up front that every team reaches a legal
+        squad (>=1 Forward/Defender/Midfielder) before the season starts.
+        """
+        pregame_year = year - 1
+        weeks = generate_weeks(pregame_year)
+        self.free_agents.extend(weeks)
+
+        # Building a squad from scratch costs far more than an incremental
+        # in-season top-up, so the draft gets a dedicated preseason budget
+        # rather than the same base used for ongoing windows — otherwise
+        # teams can only ever afford the bare legal minimum (3 players) and
+        # never reach a full matchday lineup (5).
+        for month_index, t in enumerate(self.teams.values()):
+            days_in_month = _days_in_month(month_index + 1, year)
+            t.cash = economy.starting_cash(t, days_in_month) * economy.DRAFT_BUDGET_MULTIPLIER
+
+        scarcity = self._scarcity()
+        log = market.run_initial_draft(self.teams, self.free_agents, scarcity)
+        print(f"\n--- INITIAL DRAFT ({pregame_year} pre-game season weeks) ---")
+        for line in log:
+            print(line)
+        if not log:
+            print("  (no moves)")
 
     # ------------------------------------------------------------------
     def _scarcity(self):

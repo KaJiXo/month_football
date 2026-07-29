@@ -32,7 +32,7 @@ class Player:
     id: str = field(default="")
 
     def __post_init__(self):
-        self.id = f"{self.year}-W{self.week_number:02d}"
+        self.id = f"{self.year}-{self.start_date.month:02d}-W{self.week_number}"
         self._compute_stats()
 
     # ------------------------------------------------------------------
@@ -103,14 +103,33 @@ def _clamp(v, lo=0.0, hi=100.0):
 
 
 def generate_weeks(year: int):
-    """All week-players for a given year, in order."""
+    """
+    All week-players for a given year, cut fresh within EACH calendar month
+    (not as one continuous rolling 7-day cycle across the whole year, which
+    would drift across month boundaries unevenly). Each month gets four full
+    7-day weeks plus a final short week absorbing whatever's left over:
+      31-day month -> 7+7+7+7+3 = 5 weeks
+      30-day month -> 7+7+7+7+2 = 5 weeks
+      28-day Feb   -> 7+7+7+7   = 4 weeks (no leftover)
+      29-day Feb   -> 7+7+7+7+1 = 5 weeks (leap year)
+    So in a normal (non-leap) year, February is the only month that starts
+    with 4 players instead of 5 — everyone else gets a full matchday lineup
+    worth of starters from day one.
+    """
     players = []
-    d = date(year, 1, 1)
-    week_num = 1
-    while d.year == year:
-        start = d
-        end = min(d + timedelta(days=6), date(year, 12, 31))
-        players.append(Player(year=year, week_number=week_num, start_date=start, end_date=end))
-        d = end + timedelta(days=1)
-        week_num += 1
+    for month in range(1, 13):
+        month_start = date(year, month, 1)
+        next_month_start = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        days_in_month = (next_month_start - month_start).days
+
+        d = month_start
+        week_num = 1
+        remaining = days_in_month
+        while remaining > 0:
+            length = min(7, remaining)
+            start, end = d, d + timedelta(days=length - 1)
+            players.append(Player(year=year, week_number=week_num, start_date=start, end_date=end))
+            d = end + timedelta(days=1)
+            remaining -= length
+            week_num += 1
     return players

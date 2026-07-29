@@ -7,6 +7,7 @@ MATCHDAY_REVENUE_RATE = 5.0     # cash per home_form point per home match played
 SPONSORSHIP_RATE = 2.5          # cash per legacy_rating point, per month
 BASE_STARTING_CASH = 1000.0
 SPREAD = 0.12
+DRAFT_BUDGET_MULTIPLIER = 2.0  # season-1 kickoff needs enough to actually build a 5-player squad
 
 
 def starting_cash(team, days_in_month: int) -> float:

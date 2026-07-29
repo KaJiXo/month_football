@@ -10,6 +10,8 @@ Commands (type at the prompt):
   standings       show current league table
   team <Month>    show a team's full roster + stats
   schedule        list this season's upcoming fixtures
+  clubs           list every club with squad size, position breakdown, cash
+  market          list free agents currently available to buy (nobody's roster)
   quiet / verbose toggle whether match tactics-exchanges are printed live
   season          start the next season once the current one finishes
   quit            exit
@@ -34,6 +36,33 @@ def print_team(season, name):
     print(f"  cash: {t.cash:.1f}   squad size: {len(t.roster)}")
     for p in sorted(t.roster, key=lambda p: p.position):
         print(f"    {p}")
+
+
+def print_market(season, show_list=True):
+    from collections import Counter
+    pool = season.free_agents
+    if not pool:
+        print("\nFree agent market: empty. Nobody unowned is available right now.")
+        return
+    counts = Counter(p.position for p in pool)
+    print(f"\nFree agent market: {len(pool)} available "
+          f"(Forward {counts.get('Forward',0)}, Defender {counts.get('Defender',0)}, "
+          f"Midfielder {counts.get('Midfielder',0)})")
+    if show_list:
+        for p in sorted(pool, key=lambda p: (p.position, -p.base_value)):
+            print(f"    {p}")
+
+
+def print_clubs(season):
+    print(f"\n{'Club':10s} {'Squad':>5s}  {'Fwd':>3s} {'Def':>3s} {'Mid':>3s}   {'Cash':>9s}   Lineup-5 ready?")
+    print("-" * 68)
+    for name in MONTHS:
+        t = season.teams[name]
+        fwd = sum(1 for p in t.roster if p.position == "Forward")
+        de = sum(1 for p in t.roster if p.position == "Defender")
+        mid = sum(1 for p in t.roster if p.position == "Midfielder")
+        ready = "yes" if len(t.roster) >= 5 else "no"
+        print(f"{name:10s} {len(t.roster):5d}  {fwd:3d} {de:3d} {mid:3d}   {t.cash:9.1f}   {ready}")
 
 
 def print_upcoming(season, n=10):
@@ -113,6 +142,12 @@ def main():
         elif cmd == "schedule":
             print_upcoming(season)
 
+        elif cmd == "clubs":
+            print_clubs(season)
+
+        elif cmd == "market":
+            print_market(season)
+
         elif cmd == "verbose":
             verbose = True
             print("Match tactics exchanges: ON")
@@ -129,7 +164,7 @@ def main():
                 print("Current season isn't finished yet.")
 
         else:
-            print("Unknown command. Try: n, m, run, standings, team <Month>, schedule, verbose, quiet, season, quit")
+            print("Unknown command. Try: n, m, run, standings, team <Month>, schedule, clubs, market, verbose, quiet, season, quit")
 
     print("Goodbye.")
 
